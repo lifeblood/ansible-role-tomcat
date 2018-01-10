@@ -1,0 +1,47 @@
+- name: check war file
+  shell: "find {{ JENKINS_WORKSPACE_DIR  }}{{ server_name }} -name '{{ server_war_name }}'"
+  register: java_war_name
+  delegate_to: 127.0.0.1
+
+- block:
+    - name: "end play if war file NOT found"
+      debug:
+        msg: "War file NOT found, ending play"
+
+    - meta: end_play
+  when: java_war_name.stdout == ""
+
+- name: Check Java
+  shell: source /etc/profile &&  command -v java
+  register: check_java
+  ignore_errors: True
+  changed_when: False
+
+- name: install jdk
+  include_role:
+    name: jdk
+  when: check_java.rc > 0
+
+
+- name: check tomcat home
+  stat: path={{ server_deploy_path }}/bin
+  register: tomcat_home_raw
+
+- import_tasks: tomcat.yml
+  when: tomcat_home_raw.stat.isdir is not defined
+
+#- name: Change shutdown {{ (server_port|int/2)|round|int|abs }} port & http {{ server_port }} port
+#  template: src=server.xml.j2 dest="{{ server_deploy_path }}/conf/server.xml"
+
+#- name: initialize tomcat port
+#  lineinfile: dest="{{ server_deploy_path }}/conf/server.xml" regexp='.*Connector port=.*protocol="HTTP/1.1"' line='    <Connector port="{{ server_port }}" protocol="HTTP/1.1"'
+
+- script: clean_workspace_dir.sh
+  args:
+    chdir: "{{ server_deploy_path }}"
+
+- name: sync war file to dest host
+  synchronize: src={{ java_war_name.stdout }} dest={{ server_deploy_path }}/workspace/{{ app_deploy_dir }}/ checksum=yes archive=yes
+
+- name: create ROOT directory
+  copy: src=ROOT dest={{ server_deploy_path }}/workspace/{{ app_deploy_dir }}/  mode=0755

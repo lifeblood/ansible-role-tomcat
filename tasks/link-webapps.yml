@@ -1,0 +1,2 @@
+- name: symbol link webapps
+  file: src="workspace/{{ app_deploy_dir }}" dest="{{ server_deploy_path }}/webapps" state=link

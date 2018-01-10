@@ -1,0 +1,29 @@
+- import_tasks: pre-deploy.yml
+
+- name: stop project
+  shell: "source /etc/profile && ./bin/shutdown.sh -force"
+  args:
+    chdir: "{{ server_deploy_path }}"
+  ignore_errors: yes
+
+- name: Change shutdown {{ (server_port|int/2)|round|int|abs }} port & http {{ server_port }} port
+  template: src=server.xml.j2 dest="{{ server_deploy_path }}/conf/server.xml"
+
+- name: Empty remote logs directory
+  synchronize: src=empty/ dest={{ server_deploy_path }}/logs/ delete=yes recursive=yes
+
+
+- import_tasks: link-webapps.yml
+
+- name: start project
+  shell: "source /etc/profile && nohup ./bin/startup.sh &"
+  args:
+    chdir: "{{ server_deploy_path }}"
+
+- name: wait the project port opened
+  wait_for: host={{ inventory_hostname }} port={{ server_port }} state=started 
+
+- cron:
+    name: "start {{ server_name }}  for reboot"
+    special_time: reboot
+    job: "{{ server_deploy_path }}/bin/startup.sh"

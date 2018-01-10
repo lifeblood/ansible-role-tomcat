@@ -1,0 +1,15 @@
+- name: stop project
+  shell: "source /etc/profile && ./bin/shutdown.sh -force"
+  args:
+    chdir: "{{ server_deploy_path }}"
+  ignore_errors: yes
+
+
+- name: start project
+  shell: "source /etc/profile && nohup ./bin/startup.sh &"
+  args:
+    chdir: "{{ server_deploy_path }}"
+
+- name: wait the project port opened
+  wait_for: host={{ inventory_hostname }} port={{ server_port }} state=started 
+

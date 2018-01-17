@@ -1,15 +1,15 @@
 - name: check war file
-  shell: "find {{ JENKINS_WORKSPACE_DIR  }}{{ server_name }} -name '{{ server_war_name }}'"
+  shell: "find {{ JENKINS_WORKSPACE_DIR  }}{{ server_name }} -name '{{ item }}'"
+  with_items:
+    - "{{ server_war_name.split(',') }}"
   register: java_war_name
   delegate_to: 127.0.0.1
 
-- block:
-    - name: "end play if war file NOT found"
-      debug:
-        msg: "War file NOT found, ending play"
-
-    - meta: end_play
-  when: java_war_name.stdout == ""
+- name: end play if war file NOT found
+  fail:
+    msg: "War file NOT found, ending play"
+  when: item.stdout == ""
+  with_items: "{{ java_war_name.results }}"
 
 - name: Check Java
   shell: source /etc/profile &&  command -v java
@@ -41,7 +41,8 @@
     chdir: "{{ server_deploy_path }}"
 
 - name: sync war file to dest host
-  synchronize: src={{ java_war_name.stdout }} dest={{ server_deploy_path }}/workspace/{{ app_deploy_dir }}/ checksum=yes archive=yes
+  synchronize: src={{ item.stdout }} dest={{ server_deploy_path }}/workspace/{{ app_deploy_dir }}/ checksum=yes archive=yes
+  with_items: "{{ java_war_name.results }}"
 
 - name: create ROOT directory
   copy: src=ROOT dest={{ server_deploy_path }}/workspace/{{ app_deploy_dir }}/  mode=0755
